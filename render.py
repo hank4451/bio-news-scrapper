@@ -16,6 +16,7 @@ from models import OTHER, SEOUL, Article, Grade, Story
 TELEGRAM_LIMIT = 4000
 CAPTION_LIMIT = 1024
 MAX_ENTITIES = 100
+MAX_HTML = 8000
 SHORT_TITLE = 40
 MAX_RELATED = 5
 SECTION_HEADER_ROOM = 50
@@ -56,8 +57,10 @@ def plain_text(text: str) -> str:
 
 
 def validate(text: str, limit: int) -> str:
-    if visible_len(text) > limit or entities(text) > MAX_ENTITIES:
-        raise ValueError(f"telegram message exceeds limits: {visible_len(text)} chars, {entities(text)} entities")
+    if visible_len(text) > limit or entities(text) > MAX_ENTITIES or len(text) > MAX_HTML:
+        raise ValueError(
+            f"telegram message exceeds limits: {visible_len(text)} chars, {entities(text)} entities, {len(text)} html"
+        )
     return text
 
 
@@ -69,11 +72,11 @@ def entities(text: str) -> int:
     return len(OPEN_TAG.findall(text))
 
 
-def chunk(lines: list[str], limit: int, max_entities: int = MAX_ENTITIES) -> list[str]:
+def chunk(lines: list[str], limit: int, max_entities: int = MAX_ENTITIES, max_html: int = MAX_HTML) -> list[str]:
     messages = []
     current = ""
     for line in lines:
-        too_long = visible_len(current) + visible_len(line) + 1 > limit
+        too_long = visible_len(current) + visible_len(line) + 1 > limit or len(current) + len(line) + 1 > max_html
         if current and (too_long or entities(current) + entities(line) > max_entities):
             messages.append(current.strip())
             current = line
@@ -116,7 +119,7 @@ def brief_line(story: Story) -> str:
 
 
 def quoted(lines: list[str]) -> list[str]:
-    pieces = chunk(lines, TELEGRAM_LIMIT - SECTION_HEADER_ROOM, MAX_ENTITIES - 2)
+    pieces = chunk(lines, TELEGRAM_LIMIT - SECTION_HEADER_ROOM, MAX_ENTITIES - 2, MAX_HTML - SECTION_HEADER_ROOM)
     return [f"<blockquote expandable>{piece}</blockquote>" for piece in pieces]
 
 

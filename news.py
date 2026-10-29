@@ -114,7 +114,7 @@ async def telegram(
         response = await client.post(url, data=data, files=files)
         if response.status_code == 429:
             await asyncio.sleep(response.json()["parameters"]["retry_after"])
-        elif response.status_code == 400 and "parse_mode" in data and "entit" in response.text:
+        elif response.status_code == 400 and "parse_mode" in data and "entit" in response.text.lower():
             print(f"[warn] telegram {method} rejected formatting, resending as plain text: {response.text}", file=sys.stderr)
             data = {"chat_id": chat_id, **as_plain(payload)}
         else:

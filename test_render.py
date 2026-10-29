@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from models import SEOUL, Article, Grade, Source, Story
 from render import (
     MAX_ENTITIES,
+    MAX_HTML,
     MAX_RELATED,
     TELEGRAM_LIMIT,
     chunk,
@@ -42,9 +43,10 @@ def test_format_time_shows_local_zone_and_kst():
 
 
 def test_chunk_measures_visible_text_only():
-    long_link = f'<a href="https://ex.com/{"x" * 5000}">t</a>'
+    long_link = f'<a href="https://ex.com/{"x" * 3000}">t</a>'
 
     assert chunk([long_link, long_link], 10) == [f"{long_link}\n{long_link}"]
+    assert chunk([long_link, long_link, long_link], 10) == [f"{long_link}\n{long_link}", long_link]
     assert chunk(["aaaa", "", "bbbb"], 6) == ["aaaa", "bbbb"]
     assert visible_len("<b>a&amp;b</b>") == 3
     assert visible_len("🇰🇷") == 4
@@ -166,3 +168,13 @@ def test_format_briefing_prepends_header_block():
     [message] = format_briefing([story("a", Grade.GENERAL)], "HEADER")
 
     assert message.startswith("HEADER\n\n<b>⚪ 일반 1</b>")
+
+
+def test_format_briefing_keeps_raw_html_under_limit_with_long_google_urls():
+    url_padding = "A" * 280
+    stories = [story(f"{i}{url_padding}", Grade.GENERAL) for i in range(60)]
+
+    messages = format_briefing(stories)
+
+    assert all(len(m) <= MAX_HTML for m in messages)
+    assert sum(m.count("• ") for m in messages) == 60

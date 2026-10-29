@@ -148,7 +148,7 @@ def test_as_plain_strips_formatting():
     assert as_plain(payload) == {"text": "A & B", "link_preview_options": "{}"}
 
 
-ENTITY_ERROR = (400, {"ok": False, "description": "Bad Request: can't parse entities"})
+ENTITY_ERROR = (400, {"ok": False, "description": "Bad Request: ENTITIES_TOO_LONG"})
 CHAT_ERROR = (400, {"ok": False, "description": "Bad Request: chat not found"})
 RATE_LIMITED = (429, {"ok": False, "parameters": {"retry_after": 0}})
 OK = (200, {"ok": True})
