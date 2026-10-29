@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
 from models import SEOUL, Article, Grade, Source, Story
-from render import TELEGRAM_LIMIT, chunk, format_briefing, format_caption, format_time, render_chart, visible_len
+from render import MAX_ENTITIES, TELEGRAM_LIMIT, chunk, entities, format_briefing, format_caption, format_time, render_chart, visible_len
 
 NEW_YORK = ZoneInfo("America/New_York")
 UTC_ZONE = ZoneInfo("UTC")
@@ -32,6 +32,8 @@ def test_chunk_measures_visible_text_only():
     assert chunk([long_link, long_link], 10) == [f"{long_link}\n{long_link}"]
     assert chunk(["aaaa", "", "bbbb"], 6) == ["aaaa", "bbbb"]
     assert visible_len("<b>a&amp;b</b>") == 3
+    assert visible_len("🇰🇷") == 4
+    assert chunk(["<b>a</b>", "<i>b</i>", "<b>c</b>"], 100, 2) == ["<b>a</b>\n<i>b</i>", "<b>c</b>"]
 
 
 def test_format_briefing_orders_grades_and_escapes_html():
@@ -63,6 +65,16 @@ def test_format_briefing_splits_long_general_section_into_closed_blockquotes():
     assert all(visible_len(m) <= TELEGRAM_LIMIT for m in messages)
     assert all(m.count("<blockquote expandable>") == m.count("</blockquote>") for m in messages)
     assert sum(m.count("• ") for m in messages) == 60
+
+
+def test_format_briefing_keeps_each_message_under_entity_limit():
+    stories = [story(f"{i}", Grade.GENERAL) for i in range(80)] + [story(f"m{i}", Grade.MAJOR) for i in range(40)]
+
+    messages = format_briefing(stories)
+
+    assert all(entities(m) <= MAX_ENTITIES for m in messages)
+    assert all(m.count("<blockquote expandable>") == m.count("</blockquote>") for m in messages)
+    assert sum(m.count("• ") for m in messages) == 80
 
 
 def test_format_caption_counts_articles_stories_and_grades():

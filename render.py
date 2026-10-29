@@ -14,7 +14,9 @@ from matplotlib import font_manager, pyplot as plt
 from models import OTHER, SEOUL, Article, Grade, Story
 
 TELEGRAM_LIMIT = 4000
+MAX_ENTITIES = 100
 TAG = re.compile(r"<[^>]+>")
+OPEN_TAG = re.compile(r"<[a-z]")
 GRADE_LABELS = {
     Grade.BREAKING: "🔴 속보",
     Grade.EXCLUSIVE: "🟠 단독",
@@ -44,11 +46,16 @@ def visible_len(text: str) -> int:
     return len(html.unescape(TAG.sub("", text)).encode("utf-16-le")) // 2
 
 
-def chunk(lines: list[str], limit: int) -> list[str]:
+def entities(text: str) -> int:
+    return len(OPEN_TAG.findall(text))
+
+
+def chunk(lines: list[str], limit: int, max_entities: int = MAX_ENTITIES) -> list[str]:
     messages = []
     current = ""
     for line in lines:
-        if current and visible_len(current) + visible_len(line) + 1 > limit:
+        too_long = visible_len(current) + visible_len(line) + 1 > limit
+        if current and (too_long or entities(current) + entities(line) > max_entities):
             messages.append(current.strip())
             current = line
         else:
@@ -101,7 +108,7 @@ def format_briefing(stories: list[Story]) -> list[str]:
             continue
         blocks += ["", f"<b>{GRADE_LABELS[grade]} {len(items)}</b>"]
         if grade == Grade.GENERAL:
-            pieces = chunk(general_lines(items), TELEGRAM_LIMIT)
+            pieces = chunk(general_lines(items), TELEGRAM_LIMIT, MAX_ENTITIES - 1)
             blocks += [f"<blockquote expandable>{piece}</blockquote>" for piece in pieces]
         else:
             for story in items:
