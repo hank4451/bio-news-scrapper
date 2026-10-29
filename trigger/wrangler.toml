@@ -1,0 +1,11 @@
+name = "bio-news-trigger"
+main = "index.js"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[triggers]
+crons = ["11 * * * *"]
+
+[vars]
+REPOSITORY = "hank4451/bio-news-scrapper"
+WORKFLOW = "briefing.yml"
