@@ -1,15 +1,19 @@
 TRIGGER := cd $(CURDIR)/trigger && npx wrangler
 WORKFLOW := briefing.yml
 
-.PHONY: help deploy tail secret run status logs
+.PHONY: help login deploy tail secret run status logs
 
 help:
+	@echo "make login    Cloudflare 계정 로그인"
 	@echo "make deploy   Cloudflare 트리거 Worker 배포"
 	@echo "make tail     Worker 실시간 로그"
 	@echo "make secret   GITHUB_TOKEN 비밀값 교체"
 	@echo "make run      GitHub workflow 수동 실행"
 	@echo "make status   최근 실행 10건"
 	@echo "make logs     마지막 실행 로그"
+
+login:
+	$(TRIGGER) login
 
 deploy:
 	$(TRIGGER) deploy
