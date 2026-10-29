@@ -14,7 +14,9 @@ from matplotlib import font_manager, pyplot as plt
 from models import OTHER, SEOUL, Article, Grade, Story
 
 TELEGRAM_LIMIT = 4000
+CAPTION_LIMIT = 1024
 MAX_ENTITIES = 100
+SHORT_TITLE = 40
 TAG = re.compile(r"<[^>]+>")
 OPEN_TAG = re.compile(r"<[a-z]")
 GRADE_LABELS = {
@@ -23,6 +25,7 @@ GRADE_LABELS = {
     Grade.MAJOR: "🟡 주요",
     Grade.GENERAL: "⚪ 일반",
 }
+FOLLOW_UP_LABEL = "↻ 후속 보도"
 SURFACE = "#fcfcfb"
 INK = "#0b0b0b"
 INK_MUTED = "#52514e"
@@ -43,7 +46,21 @@ def format_time(published: datetime | None, tz: ZoneInfo) -> str:
 
 
 def visible_len(text: str) -> int:
-    return len(html.unescape(TAG.sub("", text)).encode("utf-16-le")) // 2
+    return len(plain_text(text).encode("utf-16-le")) // 2
+
+
+def plain_text(text: str) -> str:
+    return html.unescape(TAG.sub("", text))
+
+
+def validate(text: str, limit: int) -> str:
+    if visible_len(text) > limit or entities(text) > MAX_ENTITIES:
+        raise ValueError(f"telegram message exceeds limits: {visible_len(text)} chars, {entities(text)} entities")
+    return text
+
+
+def shorten(title: str) -> str:
+    return title if len(title) <= SHORT_TITLE else f"{title[: SHORT_TITLE - 1].rstrip()}…"
 
 
 def entities(text: str) -> int:
@@ -88,6 +105,14 @@ def headline(story: Story) -> str:
     return f"<b>{link(lead.link, lead.title)}</b>\n<i>{meta(lead)} · {story.category}</i>{related(story)}"
 
 
+def brief_line(story: Story) -> str:
+    return f"• {link(story.lead.link, shorten(story.lead.title))} <i>— {meta(story.lead)}</i>{related(story)}"
+
+
+def quoted(lines: list[str]) -> list[str]:
+    return [f"<blockquote expandable>{piece}</blockquote>" for piece in chunk(lines, TELEGRAM_LIMIT, MAX_ENTITIES - 1)]
+
+
 def general_lines(stories: list[Story]) -> list[str]:
     by_category: dict[str, list[Story]] = {}
     for story in stories:
@@ -96,37 +121,45 @@ def general_lines(stories: list[Story]) -> list[str]:
     lines = []
     for category, items in sorted(by_category.items(), key=lambda kv: (kv[0] == OTHER, -len(kv[1]))):
         lines.append(f"<b>▸ {category} {len(items)}</b>")
-        lines += [f"• {link(s.lead.link, s.lead.title)} <i>— {meta(s.lead)}</i>{related(s)}" for s in items]
+        lines += [brief_line(s) for s in items]
     return lines
 
 
 def format_briefing(stories: list[Story]) -> list[str]:
     blocks = []
     for grade in Grade:
-        items = [s for s in stories if s.grade == grade]
+        items = [s for s in stories if s.grade == grade and not s.follow_up]
         if not items:
             continue
         blocks += ["", f"<b>{GRADE_LABELS[grade]} {len(items)}</b>"]
         if grade == Grade.GENERAL:
-            pieces = chunk(general_lines(items), TELEGRAM_LIMIT, MAX_ENTITIES - 1)
-            blocks += [f"<blockquote expandable>{piece}</blockquote>" for piece in pieces]
+            blocks += quoted(general_lines(items))
         else:
             for story in items:
                 blocks += ["", headline(story)]
-    return chunk(blocks, TELEGRAM_LIMIT)
+
+    follow_ups = [s for s in stories if s.follow_up]
+    if follow_ups:
+        blocks += ["", f"<b>{FOLLOW_UP_LABEL} {len(follow_ups)}</b>", *quoted([brief_line(s) for s in follow_ups])]
+    return [validate(message, TELEGRAM_LIMIT) for message in chunk(blocks, TELEGRAM_LIMIT)]
 
 
 def format_caption(stories: list[Story], now: datetime) -> str:
-    grades = Counter(s.grade for s in stories)
-    summary = " · ".join(f"{GRADE_LABELS[g]} {grades[g]}" for g in Grade if grades[g])
+    grades = Counter(s.grade for s in stories if not s.follow_up)
+    summary = [f"{GRADE_LABELS[g]} {grades[g]}" for g in Grade if grades[g]]
+    follow_ups = sum(s.follow_up for s in stories)
+    if follow_ups:
+        summary.append(f"{FOLLOW_UP_LABEL} {follow_ups}")
     articles = sum(len(s.articles) for s in stories)
-    return (
+    caption = (
         f"🧬 <b>바이오 브리핑</b> · {now.astimezone(SEOUL):%m/%d %H:%M} KST\n"
-        f"기사 {articles}건 · 사건 {len(stories)}건\n{summary}"
+        f"기사 {articles}건 · 새 사건 {grades.total()}건\n{' · '.join(summary)}"
     )
+    return validate(caption, CAPTION_LIMIT)
 
 
 def render_chart(stories: list[Story], now: datetime) -> bytes:
+    stories = [s for s in stories if not s.follow_up]
     counts = Counter((s.category, s.lead.source.domestic) for s in stories)
     totals = Counter(s.category for s in stories)
     categories = sorted(totals, key=lambda c: (c == OTHER, -totals[c]))

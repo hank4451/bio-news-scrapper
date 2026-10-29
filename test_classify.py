@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from classify import Rules, build_stories
+from classify import Rules, build_stories, fingerprint
 from models import OTHER, SEOUL, Article, Grade, Source
 
 RULES = Rules.from_config(tomllib.loads((Path(__file__).parent / "rules.toml").read_text()))
@@ -62,6 +62,7 @@ def test_build_stories_groups_rewritten_korean_headlines():
             article("머크, 대전에 아태 바이오공정 생산센터 준공", "히트뉴스"),
         ],
         RULES,
+        [],
     )
 
     assert [len(s.articles) for s in stories] == [2, 1]
@@ -75,6 +76,7 @@ def test_build_stories_groups_english_but_not_across_languages():
             article("앤트로픽, 1인 신약 개발사 인수", "AI타임스"),
         ],
         RULES,
+        [],
     )
 
     assert sorted(len(s.articles) for s in stories) == [1, 2]
@@ -91,6 +93,7 @@ def test_build_stories_promotes_widely_covered_story_and_orders_by_grade_then_ti
             article("머크, 대전에 아태 바이오공정 생산센터 준공", "F", hour=6),
         ],
         RULES,
+        [],
     )
 
     assert [s.grade for s in stories] == [Grade.EXCLUSIVE, Grade.MAJOR, Grade.GENERAL, Grade.GENERAL]
@@ -99,4 +102,19 @@ def test_build_stories_promotes_widely_covered_story_and_orders_by_grade_then_ti
 
 
 def test_build_stories_empty():
-    assert build_stories([], RULES) == []
+    assert build_stories([], RULES, []) == []
+
+
+def test_build_stories_marks_follow_up_of_previously_sent_story_and_sorts_it_last():
+    previous = [fingerprint("대원제약, 위식도역류질환 신약 3상 성공…연내 허가 신청")]
+
+    stories = build_stories(
+        [
+            article("대원제약, 위식도역류질환 신약 '파도프라잔' 임상 3상 성공", "뉴스1", hour=9),
+            article("한올바이오파마, 3분기 누적 매출 1242억원", "E", hour=1),
+        ],
+        RULES,
+        previous,
+    )
+
+    assert [(s.lead.publisher, s.follow_up) for s in stories] == [("E", False), ("뉴스1", True)]

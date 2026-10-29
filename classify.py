@@ -13,6 +13,8 @@ MIN_SHARED = {"ko": 8, "en": 3}
 MIN_OVERLAP = 0.5
 MAJOR_PUBLISHERS = 3
 
+Fingerprint = tuple[str, set[str]]
+
 
 def compile_any(patterns: list[str]) -> re.Pattern:
     return re.compile("|".join(f"(?:{p})" for p in patterns), re.IGNORECASE)
@@ -51,7 +53,7 @@ class Rules:
         return Grade.GENERAL
 
 
-def fingerprint(title: str) -> tuple[str, set[str]]:
+def fingerprint(title: str) -> Fingerprint:
     title = title.lower()
     if HANGUL.search(title):
         compact = NON_WORD.sub("", title)
@@ -59,7 +61,7 @@ def fingerprint(title: str) -> tuple[str, set[str]]:
     return "en", {w for w in ENGLISH_WORD.findall(title) if len(w) > 1 and w not in STOPWORDS}
 
 
-def same_story(a: tuple[str, set[str]], b: tuple[str, set[str]]) -> bool:
+def same_story(a: Fingerprint, b: Fingerprint) -> bool:
     (lang, a_tokens), (other_lang, b_tokens) = a, b
     if lang != other_lang:
         return False
@@ -67,16 +69,18 @@ def same_story(a: tuple[str, set[str]], b: tuple[str, set[str]]) -> bool:
     return shared >= MIN_SHARED[lang] and shared / min(len(a_tokens), len(b_tokens)) >= MIN_OVERLAP
 
 
-def make_story(articles: list[Article], rules: Rules) -> Story:
+def make_story(articles: list[Article], rules: Rules, previous: list[Fingerprint]) -> Story:
     grade = min(rules.grade(a.title) for a in articles)
     if grade == Grade.GENERAL and len({a.publisher for a in articles}) >= MAJOR_PUBLISHERS:
         grade = Grade.MAJOR
     categories = [rules.category(a.title) for a in articles]
-    return Story(articles, grade, next((c for c in categories if c != OTHER), OTHER))
+    marks = [fingerprint(a.title) for a in articles]
+    follow_up = any(same_story(mark, seen) for mark in marks for seen in previous)
+    return Story(articles, grade, next((c for c in categories if c != OTHER), OTHER), follow_up)
 
 
-def build_stories(articles: list[Article], rules: Rules) -> list[Story]:
-    groups: list[tuple[tuple[str, set[str]], list[Article]]] = []
+def build_stories(articles: list[Article], rules: Rules, previous: list[Fingerprint]) -> list[Story]:
+    groups: list[tuple[Fingerprint, list[Article]]] = []
     for article in articles:
         mark = fingerprint(article.title)
         for lead_mark, members in groups:
@@ -85,5 +89,5 @@ def build_stories(articles: list[Article], rules: Rules) -> list[Story]:
                 break
         else:
             groups.append((mark, [article]))
-    stories = [make_story(members, rules) for _, members in groups]
-    return sorted(stories, key=lambda s: (s.grade, -s.lead.timestamp))
+    stories = [make_story(members, rules, previous) for _, members in groups]
+    return sorted(stories, key=lambda s: (s.follow_up, s.grade, -s.lead.timestamp))

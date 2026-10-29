@@ -1,8 +1,24 @@
+import asyncio
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
+import httpx
+import pytest
+
 from models import SEOUL, Article, Source
-from news import load_sources, parse_feed, parse_published, prune, select_new
+from news import (
+    STORY_TTL_SECONDS,
+    as_plain,
+    load_seen,
+    load_sources,
+    parse_feed,
+    parse_published,
+    previous_stories,
+    prune,
+    remember,
+    select_new,
+    telegram,
+)
 
 NEW_YORK = ZoneInfo("America/New_York")
 SOURCE = Source("S", "https://s.com/rss", NEW_YORK)
@@ -77,3 +93,52 @@ def test_select_new_skips_sent_duplicate_and_stale():
 
 def test_prune_drops_entries_older_than_ttl():
     assert prune({"old": NOW - 8 * DAY, "new": NOW - DAY}, NOW) == {"new": NOW - DAY}
+
+
+def test_remember_adds_fingerprints_and_expires_old_ones(tmp_path):
+    seen = [["en", ["old"], NOW - STORY_TTL_SECONDS], ["en", ["kept"], NOW - 60]]
+
+    entries = remember(seen, [Article(SOURCE, "S", "Anthropic acquires Mithril", "https://x", None)], NOW)
+
+    assert entries == [["en", ["kept"], NOW - 60], ["en", ["acquires", "anthropic", "mithril"], NOW]]
+    assert previous_stories(entries)[1] == ("en", {"acquires", "anthropic", "mithril"})
+
+    path = tmp_path / "stories.jsonl"
+    assert load_seen(path) == []
+    path.write_text('["ko", ["대원"], 1.0]\n\n')
+    assert load_seen(path) == [["ko", ["대원"], 1.0]]
+
+
+def test_as_plain_strips_formatting():
+    payload = {"text": "<b>A &amp; B</b>", "parse_mode": "HTML", "link_preview_options": "{}"}
+
+    assert as_plain(payload) == {"text": "A & B", "link_preview_options": "{}"}
+
+
+def send_with(responses: list[int]) -> list[dict]:
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(dict(httpx.QueryParams(request.content.decode())))
+        return httpx.Response(responses[len(calls) - 1], json={"ok": False})
+
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await telegram(client, "token", "chat", "sendMessage", {"text": "<b>hi</b>", "parse_mode": "HTML"})
+
+    asyncio.run(go())
+    return calls
+
+
+def test_telegram_resends_plain_text_when_formatting_rejected():
+    calls = send_with([400, 200])
+
+    assert calls == [
+        {"chat_id": "chat", "text": "<b>hi</b>", "parse_mode": "HTML"},
+        {"chat_id": "chat", "text": "hi"},
+    ]
+
+
+def test_telegram_raises_when_plain_text_also_fails():
+    with pytest.raises(RuntimeError, match="telegram sendMessage 400"):
+        send_with([400, 400])

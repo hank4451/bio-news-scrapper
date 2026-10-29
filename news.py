@@ -12,15 +12,17 @@ from zoneinfo import ZoneInfo
 import feedparser
 import httpx
 
-from classify import Rules, build_stories
+from classify import Fingerprint, Rules, build_stories, fingerprint
 from models import Article, Source
-from render import format_briefing, format_caption, render_chart
+from render import format_briefing, format_caption, plain_text, render_chart
 
 ROOT = Path(__file__).parent
 CONFIG_PATH = ROOT / "feeds.toml"
 RULES_PATH = ROOT / "rules.toml"
-STATE_PATH = ROOT / "state" / "sent.json"
-STATE_TTL_SECONDS = 7 * 24 * 3600
+SENT_PATH = ROOT / "state" / "sent.json"
+STORIES_PATH = ROOT / "state" / "stories.jsonl"
+SENT_TTL_SECONDS = 7 * 24 * 3600
+STORY_TTL_SECONDS = 24 * 3600
 USER_AGENT = "Mozilla/5.0 (compatible; bio-news-bot)"
 GOOGLE_NEWS_LOCALES = {
     "en": "hl=en-US&gl=US&ceid=US:en",
@@ -86,22 +88,44 @@ def select_new(articles: list[Article], sent: dict[str, float], now: float, max_
     return list(fresh.values())
 
 
+def as_plain(payload: dict) -> dict:
+    return {key: plain_text(value) if key in ("text", "caption") else value for key, value in payload.items() if key != "parse_mode"}
+
+
 async def telegram(
     client: httpx.AsyncClient, token: str, chat_id: str, method: str, payload: dict, files: dict | None = None
 ) -> None:
-    response = await client.post(
-        f"https://api.telegram.org/bot{token}/{method}", data={"chat_id": chat_id, **payload}, files=files
-    )
+    url = f"https://api.telegram.org/bot{token}/{method}"
+    response = await client.post(url, data={"chat_id": chat_id, **payload}, files=files)
+    if response.status_code == 400 and "parse_mode" in payload:
+        print(f"[warn] telegram {method} rejected formatting, resending as plain text: {response.text}", file=sys.stderr)
+        response = await client.post(url, data={"chat_id": chat_id, **as_plain(payload)}, files=files)
     if response.is_error:
         raise RuntimeError(f"telegram {method} {response.status_code}: {response.text}")
 
 
-def load_state(path: Path) -> dict[str, float]:
+def load_sent(path: Path) -> dict[str, float]:
     return json.loads(path.read_text()) if path.exists() else {}
 
 
 def prune(sent: dict[str, float], now: float) -> dict[str, float]:
-    return {key: ts for key, ts in sent.items() if now - ts < STATE_TTL_SECONDS}
+    return {key: ts for key, ts in sent.items() if now - ts < SENT_TTL_SECONDS}
+
+
+def load_seen(path: Path) -> list[list]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line] if path.exists() else []
+
+
+def remember(seen: list[list], articles: list[Article], now: float) -> list[list]:
+    entries = list(seen)
+    for article in articles:
+        lang, tokens = fingerprint(article.title)
+        entries.append([lang, sorted(tokens), now])
+    return [entry for entry in entries if now - entry[2] < STORY_TTL_SECONDS]
+
+
+def previous_stories(seen: list[list]) -> list[Fingerprint]:
+    return [(lang, set(tokens)) for lang, tokens, _ in seen]
 
 
 async def run() -> None:
@@ -110,7 +134,8 @@ async def run() -> None:
     token = os.environ["TELEGRAM_BOT_TOKEN"]
     chat_id = os.environ["TELEGRAM_CHAT_ID"]
     now = datetime.now(UTC)
-    sent = load_state(STATE_PATH)
+    sent = load_sent(SENT_PATH)
+    seen = load_seen(STORIES_PATH)
 
     async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers={"User-Agent": USER_AGENT}) as client:
         results = await asyncio.gather(*(fetch(client, s) for s in load_sources(config)))
@@ -121,13 +146,18 @@ async def run() -> None:
                 {"text": f"🧬 첫 실행: 기사 {len(articles)}건 기록. 다음 실행부터 새 기사만 발송"},
             )
         elif articles:
-            stories = build_stories(articles, rules)
-            await telegram(
-                client, token, chat_id, "sendPhoto",
-                {"caption": format_caption(stories, now), "parse_mode": "HTML"},
-                {"photo": ("briefing.png", render_chart(stories, now), "image/png")},
-            )
-            for text in format_briefing(stories):
+            stories = build_stories(articles, rules, previous_stories(seen))
+            caption = format_caption(stories, now)
+            messages = format_briefing(stories)
+            if any(not s.follow_up for s in stories):
+                await telegram(
+                    client, token, chat_id, "sendPhoto",
+                    {"caption": caption, "parse_mode": "HTML"},
+                    {"photo": ("briefing.png", render_chart(stories, now), "image/png")},
+                )
+            else:
+                messages.insert(0, caption)
+            for text in messages:
                 await asyncio.sleep(1)
                 await telegram(
                     client, token, chat_id, "sendMessage",
@@ -135,8 +165,9 @@ async def run() -> None:
                 )
 
     sent.update({a.key: now.timestamp() for a in articles})
-    STATE_PATH.parent.mkdir(exist_ok=True)
-    STATE_PATH.write_text(json.dumps(prune(sent, now.timestamp()), indent=0, sort_keys=True) + "\n")
+    SENT_PATH.parent.mkdir(exist_ok=True)
+    SENT_PATH.write_text(json.dumps(prune(sent, now.timestamp()), indent=0, sort_keys=True) + "\n")
+    STORIES_PATH.write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in remember(seen, articles, now.timestamp())))
     print(f"processed {len(articles)} articles")
 
 

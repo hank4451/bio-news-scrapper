@@ -48,6 +48,7 @@ class Story:
     articles: list[Article]
     grade: Grade
     category: str
+    follow_up: bool = False
 
     @property
     def lead(self) -> Article:
