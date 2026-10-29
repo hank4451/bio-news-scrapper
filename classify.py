@@ -4,12 +4,14 @@ from dataclasses import dataclass
 from models import OTHER, Article, Grade, Story
 
 HANGUL = re.compile(r"[가-힣]")
+SUBJECT = re.compile(r"^\s*([^,，:]{1,15})[,，]\s*")
+SUBJECT_MARK = "@"
 NON_WORD = re.compile(r"\W+")
 ENGLISH_WORD = re.compile(r"[a-z0-9$]+")
 STOPWORDS = frozenset(
     "a an the of to in on for and or with by at as from is are its it this that new over after into says how why what stat plus".split()
 )
-MIN_SHARED = {"ko": 8, "en": 3}
+MIN_SHARED = {"ko": 6, "en": 3}
 MIN_OVERLAP = 0.5
 MAJOR_PUBLISHERS = 3
 
@@ -55,18 +57,32 @@ class Rules:
 
 def fingerprint(title: str) -> Fingerprint:
     title = title.lower()
-    if HANGUL.search(title):
-        compact = NON_WORD.sub("", title)
-        return "ko", {compact[i : i + 2] for i in range(len(compact) - 1)}
-    return "en", {w for w in ENGLISH_WORD.findall(title) if len(w) > 1 and w not in STOPWORDS}
+    if not HANGUL.search(title):
+        return "en", {w for w in ENGLISH_WORD.findall(title) if len(w) > 1 and w not in STOPWORDS}
+    tokens = set()
+    if match := SUBJECT.match(title):
+        tokens.add(SUBJECT_MARK + NON_WORD.sub("", match.group(1)))
+        title = title[match.end() :]
+    compact = NON_WORD.sub("", title)
+    return "ko", tokens | {compact[i : i + 2] for i in range(len(compact) - 1)}
+
+
+def split_subject(tokens: set[str]) -> tuple[str, set[str]]:
+    for token in tokens:
+        if token.startswith(SUBJECT_MARK):
+            return token[1:], tokens - {token}
+    return "", tokens
 
 
 def same_story(a: Fingerprint, b: Fingerprint) -> bool:
     (lang, a_tokens), (other_lang, b_tokens) = a, b
     if lang != other_lang:
         return False
-    shared = len(a_tokens & b_tokens)
-    return shared >= MIN_SHARED[lang] and shared / min(len(a_tokens), len(b_tokens)) >= MIN_OVERLAP
+    (a_subject, a_words), (b_subject, b_words) = split_subject(a_tokens), split_subject(b_tokens)
+    if a_subject and b_subject and a_subject not in b_subject and b_subject not in a_subject:
+        return False
+    shared = len(a_words & b_words)
+    return shared >= MIN_SHARED[lang] and shared / min(len(a_words), len(b_words)) >= MIN_OVERLAP
 
 
 def make_story(articles: list[Article], rules: Rules, previous: list[Fingerprint]) -> Story:

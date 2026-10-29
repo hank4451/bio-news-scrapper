@@ -16,14 +16,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: "3.12"
-          cache: pip
 
-      - run: pip install -r requirements.txt
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+        with:
+          enable-cache: true
+          cache-dependency-glob: requirements.txt
+
+      - run: uv pip install --system --require-hashes -r requirements.txt
 
       - run: python news.py
         env:
@@ -31,8 +37,16 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
 
       - name: Commit state
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state/
-          git diff --cached --quiet || (git commit -m "chore: update sent state" && git push)
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update sent state"
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY}.git"
+          git pull --rebase "$remote" main
+          git push "$remote" HEAD:main

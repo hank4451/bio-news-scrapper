@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from classify import Rules, build_stories, fingerprint
+from classify import Rules, build_stories, fingerprint, same_story
 from models import OTHER, SEOUL, Article, Grade, Source
 
 RULES = Rules.from_config(tomllib.loads((Path(__file__).parent / "rules.toml").read_text()))
@@ -118,3 +118,20 @@ def test_build_stories_marks_follow_up_of_previously_sent_story_and_sorts_it_las
     )
 
     assert [(s.lead.publisher, s.follow_up) for s in stories] == [("E", False), ("뉴스1", True)]
+
+
+@pytest.mark.parametrize(
+    ("a", "b", "same"),
+    [
+        ("SK바이오사이언스, 3분기 매출 증가", "SK바이오사이언스, 독감백신 출하", False),
+        ("한미약품, 비만약 임상 3상 진입", "유한양행, 비만약 임상 3상 진입", False),
+        ("삼성바이오로직스, 3분기 매출 1조 돌파", "삼성바이오로직스, 4공장 본격 가동", False),
+        ("대원제약, 위식도역류질환 신약 3상 성공…연내 허가 신청", "대원제약, 위식도역류질환 신약 '파도프라잔' 임상 3상 성공", True),
+        ("파도프라잔 연내 품목허가 신청 확정···임상3상 완료", "대원제약, P-CAB 신약 '파도프라잔' 임상 3상 완료", True),
+        ("동구바이오제약, 30억원 규모 자사주 전량 소각 결정", "동구바이오제약, 30억원 자사주 전량 소각...주주가치 제고", True),
+        ("Lilly's triple-G drug beats Ozempic", "Lilly cuts Ozempic rival price", False),
+        ("Anthropic acquires one-person biotech Mithril", "Anthropic buys Mithril, a one-person biotech", True),
+    ],
+)
+def test_same_story(a, b, same):
+    assert same_story(fingerprint(a), fingerprint(b)) is same

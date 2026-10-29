@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 from models import SEOUL, Article, Grade, Source, Story
 from render import (
     MAX_ENTITIES,
+    MAX_RELATED,
     TELEGRAM_LIMIT,
     chunk,
     entities,
@@ -140,3 +141,28 @@ def test_render_chart_ignores_follow_ups():
     stories = [story("a", Grade.GENERAL, "임상"), story("b", Grade.GENERAL, "정책", follow_up=True)]
 
     assert render_chart(stories, NOW).startswith(b"\x89PNG")
+
+
+def test_related_links_are_capped_with_remaining_count():
+    extra = tuple(Article(US, f"P{i}", "dup", f"https://ex.com/{i}", None) for i in range(MAX_RELATED + 3))
+
+    [message] = format_briefing([story("big", Grade.MAJOR, extra=extra)])
+
+    assert message.count('href="https://ex.com/') == 1 + MAX_RELATED
+    assert "외 3곳" in message
+
+
+def test_section_header_never_ends_a_message():
+    stories = [story(f"{i} {'x' * 300}", Grade.MAJOR) for i in range(30)] + [story("g", Grade.GENERAL)]
+
+    messages = format_briefing(stories)
+
+    assert len(messages) > 1
+    assert not any(m.rstrip().endswith("</b>") and m.rstrip().split("\n")[-1].startswith("<b>") for m in messages)
+    assert all(visible_len(m) <= TELEGRAM_LIMIT and entities(m) <= MAX_ENTITIES for m in messages)
+
+
+def test_format_briefing_prepends_header_block():
+    [message] = format_briefing([story("a", Grade.GENERAL)], "HEADER")
+
+    assert message.startswith("HEADER\n\n<b>⚪ 일반 1</b>")

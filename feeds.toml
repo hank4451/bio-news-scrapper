@@ -41,11 +41,6 @@ url = "https://www.biotimes.co.kr/rss/allArticle.xml"
 tz = "Asia/Seoul"
 
 [[feeds]]
-name = "의학신문"
-url = "https://www.bosa.co.kr/rss/allArticle.xml"
-tz = "Asia/Seoul"
-
-[[feeds]]
 name = "팜뉴스"
 url = "https://www.pharmnews.com/rss/allArticle.xml"
 tz = "Asia/Seoul"

@@ -17,6 +17,8 @@ TELEGRAM_LIMIT = 4000
 CAPTION_LIMIT = 1024
 MAX_ENTITIES = 100
 SHORT_TITLE = 40
+MAX_RELATED = 5
+SECTION_HEADER_ROOM = 50
 TAG = re.compile(r"<[^>]+>")
 OPEN_TAG = re.compile(r"<[a-z]")
 GRADE_LABELS = {
@@ -92,12 +94,16 @@ def meta(article: Article) -> str:
 
 def related(story: Story) -> str:
     seen = {story.lead.publisher}
-    links = []
+    others = []
     for article in story.articles[1:]:
         if article.publisher not in seen:
             seen.add(article.publisher)
-            links.append(link(article.link, article.publisher))
-    return f" ↳ {', '.join(links)}" if links else ""
+            others.append(article)
+    if not others:
+        return ""
+    links = ", ".join(link(a.link, a.publisher) for a in others[:MAX_RELATED])
+    rest = len(others) - MAX_RELATED
+    return f" ↳ {links}" + (f" 외 {rest}곳" if rest > 0 else "")
 
 
 def headline(story: Story) -> str:
@@ -110,7 +116,15 @@ def brief_line(story: Story) -> str:
 
 
 def quoted(lines: list[str]) -> list[str]:
-    return [f"<blockquote expandable>{piece}</blockquote>" for piece in chunk(lines, TELEGRAM_LIMIT, MAX_ENTITIES - 1)]
+    pieces = chunk(lines, TELEGRAM_LIMIT - SECTION_HEADER_ROOM, MAX_ENTITIES - 2)
+    return [f"<blockquote expandable>{piece}</blockquote>" for piece in pieces]
+
+
+def section(header: str, parts: list[str], gap: str) -> list[str]:
+    blocks = ["", f"<b>{header}</b>{gap}{parts[0]}"]
+    for part in parts[1:]:
+        blocks += ["", part] if gap == "\n\n" else [part]
+    return blocks
 
 
 def general_lines(stories: list[Story]) -> list[str]:
@@ -125,22 +139,21 @@ def general_lines(stories: list[Story]) -> list[str]:
     return lines
 
 
-def format_briefing(stories: list[Story]) -> list[str]:
-    blocks = []
+def format_briefing(stories: list[Story], header: str = "") -> list[str]:
+    blocks = [header]
     for grade in Grade:
         items = [s for s in stories if s.grade == grade and not s.follow_up]
         if not items:
             continue
-        blocks += ["", f"<b>{GRADE_LABELS[grade]} {len(items)}</b>"]
+        header = f"{GRADE_LABELS[grade]} {len(items)}"
         if grade == Grade.GENERAL:
-            blocks += quoted(general_lines(items))
+            blocks += section(header, quoted(general_lines(items)), "\n")
         else:
-            for story in items:
-                blocks += ["", headline(story)]
+            blocks += section(header, [headline(s) for s in items], "\n\n")
 
     follow_ups = [s for s in stories if s.follow_up]
     if follow_ups:
-        blocks += ["", f"<b>{FOLLOW_UP_LABEL} {len(follow_ups)}</b>", *quoted([brief_line(s) for s in follow_ups])]
+        blocks += section(f"{FOLLOW_UP_LABEL} {len(follow_ups)}", quoted([brief_line(s) for s in follow_ups]), "\n")
     return [validate(message, TELEGRAM_LIMIT) for message in chunk(blocks, TELEGRAM_LIMIT)]
 
 
