@@ -27,8 +27,8 @@ jobs:
 
       - run: python news.py
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
 
       - name: Commit state
         run: |
