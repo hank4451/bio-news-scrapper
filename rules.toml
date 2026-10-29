@@ -1,0 +1,111 @@
+[grades]
+breaking = ['^\s*[\[【(<]?\s*속보', '\bbreaking\b']
+exclusive = ['[\[【(<]\s*단독', '^\s*exclusive\b', '\bexclusive\s*:', '\|\s*exclusive\s*$']
+major = [
+    'FDA (approv|grants|accepts|clears)', '\bapproves?\b', '\bapproval\b', 'clinical hold',
+    '품목허가', '허가 ?(획득|승인)', '조건부 ?허가',
+    'phase ?(3|iii)\b', '3상',
+    '\$ ?\d+(\.\d+)? ?(b|bn|billion)\b', '\d+(\.\d+)? ?billion', '\d+(\.\d+)? ?조 ?원', '\d[\d,.]* ?억 ?달러',
+    '\bacquir', '\bmerger\b', '인수', '합병', '기술(이전|수출)',
+    '\blayoffs?\b', 'job cuts', '구조조정',
+    '\bCRL\b', 'complete response', '\bfail(s|ed)?\b', '\bhalt', 'discontinu', '중단', '실패',
+    '\brecall', '리콜',
+]
+
+[[categories]]
+name = "허가·규제"
+patterns = [
+    '\bFDA\b', '\bEMA\b', '\bMHRA\b', '\bPMDA\b', '\bNMPA\b', '\bCHMP\b',
+    'approv', 'clearance', '\bCRL\b', 'complete response', 'PDUFA', '\bBLA\b', '\bs?NDA\b', '\bIND\b',
+    'breakthrough therapy', 'fast track', 'orphan drug', 'priority review', 'label expansion', '\brecall', 'warning letter',
+    '식약처', '식품의약품안전처', '품목허가', '허가', '승인', '신속심사', '혁신치료제', '희귀의약품', '회수', '리콜',
+    '적응증', 'CE ?MDR', '오남용',
+]
+
+[[categories]]
+name = "M&A·라이선스"
+patterns = [
+    '\bacqui', '\bmerger', '\bbu(y|ys|ying|yout|ought)\b', 'takeover', '\bM&A\b', 'licens', '\bdeals?\b', '\bpartner',
+    'collaborat', 'option to', 'rights to', 'teams? up', 'joins? forces', 'to form\b',
+    '인수', '합병', '기술이전', '기술수출', '라이선스', 'L/O', '제휴', '공동 ?개발', '공동 ?연구', '파트너십', '계약',
+    '\bMOU\b', '업무협약', '판권', '맞손', '손잡', '협업', '확보',
+]
+
+[[categories]]
+name = "투자·IPO"
+patterns = [
+    '\bIPOs?\b', '\brais(es|ed|ing)\b', '\bfunding', '\bfinancing', 'series [a-f]\b', 'seed round', '\bventure', '\bVC\b',
+    '\boffering', '\bSPAC\b', '\bdebut', '\binvest', '\bgrant\b', '\bETFs?\b',
+    '상장', '투자', '시리즈 ?[A-F]', '펀딩', '증자', '유증', '기업공개', '코스닥', '코스피', '전환사채', '출자', '신주',
+]
+
+[[categories]]
+name = "임상"
+patterns = [
+    'phase ?(1|2|3|i{1,3})', '\btrials?\b', 'topline', 'readout', 'endpoint', '\bdata\b', 'efficacy', '\bpatients?\b',
+    '\bdos(ed|ing)\b', '\benroll', '\binterim\b', '\bresults?\b', '\bbeats?\b', '\btops\b', '\bbests\b', '\btrounces\b',
+    '\bASCO\b', '\bESMO\b', '\bAACR\b', '\bASH\b',
+    '임상', '[1-3]상', '톱라인', '탑라인', '유효성', '안전성', '투약', '투여', '환자', '병용', '효과', '지표',
+]
+
+[[categories]]
+name = "정책"
+patterns = [
+    '\bpolic', '\bcongress', '\bsenat', '\bHHS\b', '\bCMS\b', 'medicare', 'medicaid', 'tariff', 'drug pric', '\bpricing\b',
+    '\bIRA\b', 'executive order', 'white house', '\btrump', '\bRFK\b', '\bkennedy', 'legislat', '\bbill\b', 'biosecure',
+    '\btreasury\b', '\bbans?\b', '\bblocks?\b', '\brule\b', '\bbudget\b', '\bgovernment\b', '\bnurture\b', '\bbacks\b',
+    '\b340B\b', 'affordab',
+    '정부', '국회', '보건복지부', '복지부', '약가', '건보', '건강보험', '급여', '수가', '법안', '관세', '정책', '규제',
+    '산업부', '과기정통부', '중기부', '지원 ?사업', '총리', '육성', '시범사업', '제도', '심평원', '지자체',
+]
+
+[[categories]]
+name = "실적·경영"
+patterns = [
+    'earnings', '\brevenue', '\bquarter', '\bQ[1-4]\b', '\bsales\b', '\bprofit', '\blayoffs?\b', 'job cuts', '\bcuts?\b',
+    'restructur', '\bCEO\b', '\bCFO\b', '\bappoint', '\bhir(es|ing)\b', '\bresign', 'steps down', '\bguidance\b',
+    '\bshares\b', '\bstocks?\b', '\bemployer', '\bworkforce\b', 'DEF 14A',
+    '실적', '매출', '영업이익', '순이익', '분기', '흑자', '적자', '대표', '사장', '선임', '취임', '사임', '구조조정',
+    '감원', '인사', '주가', '주주', '배당', '급등', '급락', '특징주', '노사', '파업', '채용', '소송', '과징금', '의혹',
+]
+
+[[categories]]
+name = "생산·제조"
+patterns = [
+    'manufactur', '\bplants?\b', '\bfacilit', '\bsites?\b', 'breaks? ground', '\bhub\b', '\bCDMO\b', '\bCMO\b',
+    '\bsupply\b', 'bioprocess',
+    '공장', '생산', '준공', '착공', '개소', '거점', '설비', 'CDMO', 'CMO', '원부자재', '공급망',
+]
+
+[[categories]]
+name = "출시·영업"
+patterns = [
+    '\blaunch', 'rolls? out', '\bprice\b', '\bslash', '\bmarket(s|ing)?\b',
+    '출시', '공급', '유통', '판매', '처방', '시장', '채널', '프로모션', '캠페인', '라인업', '마케팅',
+]
+
+[[categories]]
+name = "연구"
+patterns = [
+    '\bstudy', '\bresearch', '\bscientist', '\bdiscover', '\bpaper\b', '\bjournal\b', '\bgenes?\b', '\bgenetic',
+    'CRISPR', '\bmRNA\b', 'antibod', 'cell therapy', '\bAI\b', '\batlas\b', 'sheds light', '\btumou?rs?\b', '\bR&D\b',
+    '\bnotebook\b', '\bplatform',
+    '연구', '논문', '개발', '발견', '규명', '기술', '플랫폼', '후보물질', '유전자', '세포', '항체', '신약',
+]
+
+[[categories]]
+name = "학회·행사"
+patterns = [
+    '\bconference', '\bsummit', '\bsymposi', '\bforum\b', '\bconvention', '\bparticipate', '\bpresents?\b', '\bexpo\b',
+    '\bhosts?\b',
+    '학회', '포럼', '컨퍼런스', '콘퍼런스', '서밋', '엑스포', '박람회', '심포지엄', '교류회', '세미나', '행사', '개최',
+    '성료', '교육', '참가', '참여', '시연', 'BIX', '학술',
+]
+
+[[categories]]
+name = "의료·병원"
+patterns = [
+    '\bhospital', '\bhealth ?care\b', '\bclinic', '\bcancer\b', '\bdeaths?\b', '\bopioid',
+    '병원', '의료', '진료', '수술', '시술', '치료', '통증', '질환', '건강', '검진', '교수', '표창', '수상', '기부',
+    '간호', '약사', '의사', '응급', '독감', '난임',
+]

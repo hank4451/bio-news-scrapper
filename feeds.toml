@@ -3,59 +3,73 @@ max_age_hours = 24
 [[feeds]]
 name = "STAT"
 url = "https://www.statnews.com/feed/"
+tz = "America/New_York"
 
 [[feeds]]
 name = "BioSpace"
 url = "https://www.biospace.com/all-news.rss"
+tz = "America/New_York"
 
 [[feeds]]
 name = "BioPharma Dive"
 url = "https://www.biopharmadive.com/feeds/news/"
+tz = "America/New_York"
 
 [[feeds]]
 name = "Nature Biotechnology"
 url = "https://www.nature.com/nbt.rss"
+tz = "Europe/London"
 
 [[feeds]]
 name = "Pharmaceutical Technology"
 url = "https://www.pharmaceutical-technology.com/feed/"
+tz = "Europe/London"
 
 [[feeds]]
 name = "히트뉴스"
 url = "https://www.hitnews.co.kr/rss/allArticle.xml"
+tz = "Asia/Seoul"
 
 [[feeds]]
 name = "더바이오"
 url = "https://www.thebionews.net/rss/allArticle.xml"
+tz = "Asia/Seoul"
 
 [[feeds]]
 name = "바이오타임즈"
 url = "https://www.biotimes.co.kr/rss/allArticle.xml"
+tz = "Asia/Seoul"
 
 [[feeds]]
 name = "의학신문"
 url = "https://www.bosa.co.kr/rss/allArticle.xml"
+tz = "Asia/Seoul"
 
 [[feeds]]
 name = "팜뉴스"
 url = "https://www.pharmnews.com/rss/allArticle.xml"
+tz = "Asia/Seoul"
 
 [[queries]]
 name = "Fierce Biotech"
 q = "site:fiercebiotech.com when:1d"
 lang = "en"
+tz = "America/New_York"
 
 [[queries]]
 name = "Endpoints News"
 q = "site:endpts.com when:1d"
 lang = "en"
+tz = "America/New_York"
 
 [[queries]]
 name = "Google News · biotech"
 q = "biotech OR biopharma OR \"clinical trial\" when:1d"
 lang = "en"
+tz = "UTC"
 
 [[queries]]
 name = "Google News · 바이오"
 q = "바이오 OR 신약 OR 임상 when:1d"
 lang = "ko"
+tz = "Asia/Seoul"
