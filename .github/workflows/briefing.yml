@@ -2,7 +2,7 @@ name: bio-news
 
 on:
   schedule:
-    - cron: "11 * * * *"
+    - cron: "40 * * * *"
   workflow_dispatch:
 
 permissions:
